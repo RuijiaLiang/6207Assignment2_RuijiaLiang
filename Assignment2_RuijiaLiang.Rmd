@@ -90,6 +90,62 @@ data <- rbind(sp_data,meta_data)
 
 
 
+# Calculate the log response ratio (lnRR) effect size
+
+
+```{r lnRR effect size}
+data <- metafor::escalc(measure = "ROM", m1i=oa.mean, m2i=ctrl.mean, sd1i=oa.sd, sd2i=ctrl.sd, n1i=oa.n, n2i=ctrl.n, data = data, var.names = c("LRR","LRR_var"))
+
+data <- na.omit(data)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
