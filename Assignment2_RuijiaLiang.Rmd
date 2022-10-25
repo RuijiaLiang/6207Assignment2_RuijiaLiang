@@ -18,37 +18,40 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r libraries, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE}
 library(pacman)
-p_load(bookdown, devtools, tidyverse, ggforce, GGally, flextable, latex2exp, png, magick, metafor, MASS, emmeans, R.rsp, orchaRd, pander, mathjaxr, equatags, vembedr)
+p_load(bookdown, devtools, tidyverse, ggforce, GGally, flextable, latex2exp, png, magick, metafor, MASS, emmeans, R.rsp, orchaRd, pander, mathjaxr, equatags, vembedr,data.table)
 ```
 
 # Preparation before analysing
 
 ```{r load the data, echo = FALSE, results = 'hide', warning=FALSE, error=FALSE, message=FALSE}
-data <- read_csv("./data/OA_activitydat_20190302_BIOL3207.csv")
+raw_data <- read_csv("./data/OA_activitydat_20190302_BIOL3207.csv")
+
+paper_data <- read_csv("./data/clark_paper_data.csv")
+
+meta_data <- read_csv("./data/ocean_meta_data.csv")
 ```
 
 
 ```{r remove NA}
-data <- data[complete.cases(data),]
+raw_data <- raw_data[complete.cases(raw_data),]
 ```
 
 
 ```{r convert into factors}
-data$species <- factor(data$species)
-data$treatment <- factor(data$treatment)
+raw_data$species <- factor(raw_data$species)
+raw_data$treatment <- factor(raw_data$treatment)
 ```
 
 
-# Generate the summary statistics 
+# Generate the summary statistics
 
 
 ```{r get N and sd and means}
 get_statistics <- function(species_name){
-  t_species_data <- data %>% filter(species==species_name,treatment=="CO2")
-  c_species_data <- data %>% filter(species==species_name,treatment=="control")
+  t_species_data <- raw_data %>% filter(species==species_name,treatment=="CO2")
+  c_species_data <- raw_data %>% filter(species==species_name,treatment=="control")
 
-  species_statistics <- data.frame(species = character(), treatment = character(), N = numeric(), mean = numeric(), sd = numeric())
-  species_statistics <- data.frame(species = character(), ctrl.n = numeric(), ctrl.mean=numeric(), ctrl.sd = numeric(), oa.n=numeric(), oa.mean = numeric(), oa.sd = numeric())
+  species_statistics <- data.frame(Species = character(), ctrl.n = numeric(), ctrl.mean=numeric(), ctrl.sd = numeric(), oa.n=numeric(), oa.mean = numeric(), oa.sd = numeric())
   
   species_statistics[1,1] <- species_name
   species_statistics[1,2] <- length(c_species_data$activity)
@@ -70,15 +73,20 @@ flextable(summary_table) %>% add_header_lines(.,values = "Summary of data")
 
 
 
-# Merge the summary statistics with the metadata
+# Merge the summary statistics with the clark_paper_data
 
 
-```{r}
-
+```{r combine the dataframes}
+sp_data <- cbind(paper_data,summary_table)
 ```
 
 
+# Merge the sp_data with the meta_data
 
+
+```{r combine the dataframes again}
+data <- rbind(sp_data,meta_data)
+```
 
 
 
