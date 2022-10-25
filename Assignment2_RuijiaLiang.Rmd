@@ -21,19 +21,22 @@ library(pacman)
 p_load(bookdown, devtools, tidyverse, ggforce, GGally, flextable, latex2exp, png, magick, metafor, MASS, emmeans, R.rsp, orchaRd, pander, mathjaxr, equatags, vembedr)
 ```
 
+# Preparation before analysing
 
-```{r, load the data, echo = FALSE, results = 'hide', warning=FALSE, error=FALSE, message=FALSE}
+```{r load the data, echo = FALSE, results = 'hide', warning=FALSE, error=FALSE, message=FALSE}
 data <- read_csv("./data/OA_activitydat_20190302_BIOL3207.csv")
 ```
 
 
+```{r remove NA}
+data <- data[complete.cases(data),]
+```
 
 
-
-
-
-
-
+```{r convert into factors}
+data$species <- factor(data$species)
+data$treatment <- factor(data$treatment)
+```
 
 
 
