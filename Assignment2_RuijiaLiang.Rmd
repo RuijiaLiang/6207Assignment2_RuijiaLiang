@@ -1,0 +1,53 @@
+---
+title: "Assignment2_RuijiaLiang"
+author: "Ruijia Liang u7457322"
+date: "`r Sys.Date()`"
+output: 
+  bookdown::html_document2:
+    code_folding: show
+    number_sections: no
+    toc: yes
+    toc_depth: 6
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r libraries, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE}
+library(pacman)
+p_load(bookdown, devtools, tidyverse, ggforce, GGally, flextable, latex2exp, png, magick, metafor, MASS, emmeans, R.rsp, orchaRd, pander, mathjaxr, equatags, vembedr)
+```
+
+
+```{r, load the data, echo = FALSE, results = 'hide', warning=FALSE, error=FALSE, message=FALSE}
+data <- read_csv("./data/OA_activitydat_20190302_BIOL3207.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
