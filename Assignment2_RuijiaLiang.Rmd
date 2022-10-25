@@ -100,8 +100,23 @@ data <- na.omit(data)
 ```
 
 
+# Model fitted to the data
 
 
+```{r add obs}
+# Add in observation-level (residual) column
+data$residual <- 1:dim(data)[1]
+```
+
+
+```{r model}
+model1 <- metafor::rma.mv(yi = LRR, V = LRR_var, random=list(~1|Study, ~1|residual), test = "t", dfs = "contain", data=data)
+summary(model1)
+```
+
+
+
+# Findings and forest plot
 
 
 
