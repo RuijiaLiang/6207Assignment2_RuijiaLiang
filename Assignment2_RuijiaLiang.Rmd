@@ -17,6 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r libraries, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE}
+# load packages
 library(pacman)
 p_load(bookdown, devtools, tidyverse, ggforce, GGally, flextable, latex2exp, png, magick, metafor, MASS, emmeans, R.rsp, orchaRd, pander, mathjaxr, equatags, vembedr,data.table)
 ```
@@ -24,50 +25,74 @@ p_load(bookdown, devtools, tidyverse, ggforce, GGally, flextable, latex2exp, png
 # Preparation before analysing
 
 ```{r load the data, echo = FALSE, results = 'hide', warning=FALSE, error=FALSE, message=FALSE}
+# load the data into R
 raw_data <- read_csv("./data/OA_activitydat_20190302_BIOL3207.csv")
-
+# load the data into R
 paper_data <- read_csv("./data/clark_paper_data.csv")
-
+# load the data into R
 meta_data <- read_csv("./data/ocean_meta_data.csv")
 ```
 
 
 ```{r remove NA}
+# remove the NAs in the data
 raw_data <- raw_data[complete.cases(raw_data),]
 ```
 
 
 ```{r convert into factors}
+# useful to have species and treatment column turning into factor type
 raw_data$species <- factor(raw_data$species)
 raw_data$treatment <- factor(raw_data$treatment)
 ```
 
 
+```{r check spelling}
+# check spelling in species and treatment by detecting whether there will be a new column caused by error
+table(raw_data$species)
+table(raw_data$treatment)
+```
+
 # Generate the summary statistics
 
 
 ```{r get N and sd and means}
+# write a function to generate the statistics of each species under different treatment
+
+# define the function name and what should be input
 get_statistics <- function(species_name){
+  # extract the rows with input species and CO2 treatment
   t_species_data <- raw_data %>% filter(species==species_name,treatment=="CO2")
+  # extract the rows with input species and control treatment
   c_species_data <- raw_data %>% filter(species==species_name,treatment=="control")
 
+  # create an empty data frame, ready for storing values of different statistics
   species_statistics <- data.frame(Species = character(), ctrl.n = numeric(), ctrl.mean=numeric(), ctrl.sd = numeric(), oa.n=numeric(), oa.mean = numeric(), oa.sd = numeric())
   
+  # assign the species name
   species_statistics[1,1] <- species_name
+  # assign the N of the control group
   species_statistics[1,2] <- length(c_species_data$activity)
-  species_statistics[1,3] <- mean(c_species_data$activity)
+  # assign the mean of the control group
+  species_statistics[1,3] <- mean(c_species_data$activity) 
+  # assign the sd of the control group
   species_statistics[1,4] <- sd(c_species_data$activity)
+  # assign the N of the CO2 group
   species_statistics[1,5] <- length(t_species_data$activity)
+  # assign the N of the CO2 group
   species_statistics[1,6] <- mean(t_species_data$activity)
+  # assign the N of the CO2 group
   species_statistics[1,7] <- sd(t_species_data$activity)
-
+  # return the data frame
   return(species_statistics)
 }
 ```
 
 
 ```{r make a summary table}
+# combine the rows to get a summary data frame
 summary_table <- rbind(get_statistics("acantho"),get_statistics("ambon"),get_statistics("chromis"),get_statistics("humbug"),get_statistics("lemon"),get_statistics("whitedams"))
+# structure the data frame in a well format
 flextable(summary_table) %>% add_header_lines(.,values = "Summary of data")
 ```
 
@@ -77,7 +102,10 @@ flextable(summary_table) %>% add_header_lines(.,values = "Summary of data")
 
 
 ```{r combine the dataframes}
+# combine the paper data with the summary table
 sp_data <- cbind(paper_data,summary_table)
+# remove the NAs in the data
+sp_data <- sp_data[complete.cases(sp_data),]
 ```
 
 
@@ -85,68 +113,149 @@ sp_data <- cbind(paper_data,summary_table)
 
 
 ```{r combine the dataframes again}
+# combine the data generated above with the big meta data
 data <- rbind(sp_data,meta_data)
+# remove NA
+data <- na.omit(data)
 ```
 
 
 
 # Calculate the log response ratio (lnRR) effect size
 
+Apply the 'escalc' function to calculate the lnRR effext size
 
 ```{r lnRR effect size}
-data <- metafor::escalc(measure = "ROM", m1i=oa.mean, m2i=ctrl.mean, sd1i=oa.sd, sd2i=ctrl.sd, n1i=oa.n, n2i=ctrl.n, data = data, var.names = c("LRR","LRR_var"))
+# use 'ROM' in measure for the log transformed ratio of means
+data <- metafor::escalc(measure = "ROM", 
+                        # assign the statistic of CO2 and control to vectors
+                        m1i=oa.mean, m2i=ctrl.mean, sd1i=oa.sd, sd2i=ctrl.sd, n1i=oa.n, n2i=ctrl.n, 
+                        # use data as the data source
+                        data = data, 
+                        # define the names
+                        var.names = c("lnRR","lnRR_var"))
 
-data <- na.omit(data)
+# quick check
+head(data)
+```
+
+The warning message shows there are soma NaNs, which needs to be removed.
+
+```{r remove NaNs}
+data <- data[complete.cases(data),]
+```
+
+
+Now the data is ready to write out.
+
+```{r write out}
+# use 'write_csv' function to write the tibble to a csv file located in the folder of this working directory
+write_csv(data, "u7457322_BIOL3207_Assignment2_data.csv")
 ```
 
 
 # Model fitted to the data
 
+Make a extra column to the data in order to add the random effect of observation
 
 ```{r add obs}
-# Add in observation-level (residual) column
+# add in observation-level (residual) column
 data$residual <- 1:dim(data)[1]
 ```
 
 
 ```{r model}
-model1 <- metafor::rma.mv(yi = LRR, V = LRR_var, random=list(~1|Study, ~1|residual), test = "t", dfs = "contain", data=data)
-summary(model1)
+# conduct a multilevel meta-analytic model
+MLMA <- metafor::rma.mv(yi = lnRR~1, V = lnRR_var, random=list(~1|Study, ~1|residual), method = "REML", test = "t", dfs = "contain", data=data)
+MLMA
 ```
 
 
 
-# Findings and forest plot
+# Interpretation
+
+Measure the heterogeneity in effect size estimates across studies.
+
+```{r I^2}
+# calculate I^2 by i2_ml function
+i2_result <- orchaRd::i2_ml(MLMA,data = data)
+
+# make a tibble
+i2_tibble <- tibble(type = firstup(gsub("I2_", "", names(i2_result))), I2 = i2_result)
+# construct a well format
+flextable(i2_tibble) %>%
+    align(part = "header", align = "center") %>%
+    compose(part = "header", j = 1, value = as_paragraph(as_b("Type"))) %>%
+    compose(part = "header", j = 2, value = as_paragraph(as_b("I"), as_b(as_sup("2")),
+        as_b("(%)")))
+```
 
 
 
+```{r prediction intervals}
+pd_MLMA <- predict(MLMA)
+pd_MLMA
+```
+
+
+Make a forest plot to visualize the statistic values.
+
+```{r forest-plot, fig.cap="Orchard plot showing the mean lnRR and k is the number of effect sizes and the number of studies are in brackets."}
+# make the plot using orchard_plot function
+# mod = "1" indicates for intercept only model
+# N to specify the sample size
+forest_1 <- orchaRd::orchard_plot(MLMA, mod = "1", group = "Study", data = data, xlab = "the log response ratio (lnRR)", angle = 45, N = "Average.n")
+forest_1
+```
+
+
+Based on the examination and the plot, we can derive the following arguments:
+
++ The MLMA model constructed above suggested that, on average, across all the species, for every 1 unit increase in the acidification, fish activity would increase by `r coef(MLMA)` unit.
+
++ Figure \@ref(fig:forest-plot) well supported the outcome of the MLMA model. In Figure \@ref(fig:forest-plot), the mean estimate is shown as the black dot located near the vertical dash line, suggesting that the mean is close to 0.
+
++ The MLMA model showed 95% confidence interval is between `r MLMA$ci.lb` to `r MLMA$ci.ub`. That is to say, 95% of the time we would expect the true mean to fall between `r MLMA$ci.lb` to `r MLMA$ci.ub`. It is also reasonable to say that if the experiment were repeated many many times, 95% of the confidence intervals constructed would contain the true meta-analytic mean. 
+
++ The prediction intervals are used to quantify the heterogeneity. The MLMA model indicated a significant amount of heterogeneity among effects (Q = `r MLMA$QE`, df = 794, p = <0.001), with effect sizes expected to be as low as `r pd_MLMA$pi.lb` to as high as `r pd_MLMA$pi.ub`.
+
++ The $I^2$ estimates reveal the proportion of total heterogeneity. *I<sup>2</sup>*total from the multilevel meta-analytic model is 100%, suggesting that we got highly heterogeneous effect size data as the sampling variation only contributes to almost 0% of the total variation in effects, at least this is what is shown by the *I<sup>2</sup>*total = `r i2_result[1]`. Only `r i2_result[2]` of the total variation in effect size estimates is the result of differences between studies, while residuals contributed `r i2_result[3]` to the variation.
+
+
+# Funnel plot
+
+Funnel plots are mainly used to observe whether there are various biases in the results of meta-analysis, such as publication bias or other biases. The funnel plot can be used to visually assess whether the study is biased or not.
+
+Here it is made to visually assess the possibility of publication bias.
+
+```{r funnel-plot, fig.cap=""}
+# make the funnel plot by 'funnel' function
+funnel_1 <- metafor::funnel(x = data$lnRR, vi = data$lnRR_var, yaxis = "seinv",
+                            # specify the number of decimal places to which the tick mark labels of the x- and y-axis should be rounded.
+                            digits = 2, 
+                            # specify the level of the pseudo confidence interval region
+                            level = c(0.1, 0.05, 0.01), 
+                            # specify the color to use for shading the pseudo confidence interval region and the color to use for the points
+                            shade = c("white", "gray", "darkgray"),col = "slateblue4",
+                            las = 1, 
+                            xlab = "the log response ratio (lnRR)",  
+                            # specify the y-axis limits
+                            ylim=c(1:7,by=2),
+                            # specify the location of the vertical ‘reference’ line
+                            refline=0, 
+                            # add the legend
+                            legend = TRUE)
+```
+
+
+Based on Figure \@ref(fig:funnel-plot), we can derive the following arguments:
+
++ 
+Missing corners can occur if there is publication bias, such as when some negative results are not published
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Time-lag plot
 
 
 
