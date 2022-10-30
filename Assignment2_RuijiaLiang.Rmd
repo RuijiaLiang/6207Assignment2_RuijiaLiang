@@ -167,7 +167,7 @@ data$residual <- 1:dim(data)[1]
 ```
 
 
-```{r model}
+```{r model,warning=FALSE}
 # conduct a multilevel meta-analytic model
 MLMA <- metafor::rma.mv(yi = lnRR~1, V = lnRR_var, random=list(~1|Study, ~1|residual), method = "REML", test = "t", dfs = "contain", data=data)
 MLMA
@@ -195,7 +195,7 @@ flextable(i2_tibble) %>%
 
 
 
-```{r prediction intervals}
+```{r prediction intervals,warning=FALSE}
 pd_MLMA <- predict(MLMA)
 pd_MLMA
 ```
@@ -231,7 +231,7 @@ Funnel plots are mainly used to observe whether there are various biases in the 
 
 Here it is made to visually assess the possibility of publication bias.
 
-```{r funnel-plot-1, fig.cap=""}
+```{r funnel-plot-1, fig.cap="In the funnel plot, the dotted lines are the theoretical 95% sampling variance intervals. Shaded regions represent the p-value of studies."}
 # make the funnel plot by 'funnel' function
 funnel_1 <- metafor::funnel(x = data$lnRR, vi = data$lnRR_var, yaxis = "seinv",
                             # specify the number of decimal places to which the tick mark labels of the x- and y-axis should be rounded.
@@ -244,6 +244,7 @@ funnel_1 <- metafor::funnel(x = data$lnRR, vi = data$lnRR_var, yaxis = "seinv",
                             xlab = "the log response ratio (lnRR)",  
                             # specify the y-axis limits
                             ylim=c(1:7,by=2),
+                            xlim=c(-3,3),
                             # specify the location of the vertical ‘reference’ line
                             refline=0, 
                             # add the legend
@@ -290,10 +291,13 @@ Based on Figure \@ref(fig:timelag-plot-1), we can derive the following arguments
 
 We can use multilevel meta-regression to quantify time lag bias.
 
-```{r year_MLMR}
+```{r year_MLMR,warning=FALSE}
+# centre on the mean of the Year column by simply subtracting every value of Year by the “mean year”
+data <- data %>% mutate(Year_c = Year..online. - mean(Year..online.))
+
 # apply rma.mv function to complete multilevel meta-regression
 # the moderator here is the online publication year
-year_MLMR <- rma.mv(lnRR ~ Year..online., V = lnRR_var, random = list(~1 | Study, ~1 | residual), test = "t", dfs = "contain", data = data)
+year_MLMR <- rma.mv(lnRR ~ Year_c, V = lnRR_var, random = list(~1 | Study, ~1 | residual), test = "t", dfs = "contain", data = data)
 
 summary(year_MLMR)
 ```
@@ -323,7 +327,7 @@ Based on the results, we can derive the following arguments:
 
 Except for time lag bias, we also got file-drawer effects.
 
-```{r inverse_MLMR}
+```{r inverse_MLMR,warning=FALSE}
 # apply rma.mv function to complete multilevel meta-regression
 # the moderator here is the inverse sampling variance, presented as (1 / lnRR_var)
 inverse_MLMR <- rma.mv(lnRR ~ (1 / lnRR_var), V = lnRR_var, random = list(~1 | Study, ~1 | residual), test = "t", dfs = "contain", data = data)
@@ -345,6 +349,57 @@ Based on the results, we can derive the following arguments:
 + The full model, that accounts for the both the fixed and random effects, explains `r r2_inverse_MLMR[2]*100`% of variance in effect size.
 
 + Inverse sampling variance explains `r r2_inverse_MLMR[1]*100`% of the effect size variance, which is very small.
+
+
+# MLMR with IF as a moderator for publication bias
+
+IF is likely to be one moderator for potential publication bias.
+
+```{r if_MLMR,warning=FALSE}
+# apply rma.mv function to complete multilevel meta-regression
+# the moderator here is the IF
+if_MLMR <- rma.mv(lnRR ~ Pub.year.IF, V = lnRR_var, random = list(~1 | Study, ~1 | residual), test = "t", dfs = "contain", data = data)
+
+if_MLMR
+```
+
+
+
+```{r r2_if_MLMR}
+# conduct statistical test to test for heterogeneity using r2_ml function
+r2_if_MLMR <- orchaRd::r2_ml(if_MLMR)
+r2_if_MLMR
+```
+
+
+Based on the results, we can derive the following arguments:
+
++ The full model, that accounts for the both the fixed and random effects, explains `r r2_if_MLMR[2]*100`% of variance in effect size.
+
++ Inverse sampling variance explains `r r2_if_MLMR[1]*100`% of the effect size variance.
+
+
+# Potential for publication bias
+
++ *Publication bias* is the nature and direction of the research results lead to the bias caused by the published and unpublished research results, which is the main reason that affects the validity of the results in the meta-analysis
+
+Based on the results, we can derive the following arguments:
+
++ *Time lag*. From Figure \@ref(fig:timelag-plot-1) and the analysis, we can see that earlier year studies have slightly higher sampling variance, which means lower precision than studies done in recent years. The earlier year studies show higher effect size compared with studies that are done in later years. The underpowered studies that get surprising results often go published first, and these initial studies often inspire a series of new experiments to test whether the pattern exists in new research systems. Under this circumstance, the first few studies may not be good enough.
+
++ *The publication bias*. From Figure \@ref(fig:funnel-plot-1) and the analysis, we can see that research or papers with significant outcome are more likely to be published. Research with poorer quality and opposite effect are going unpublished, which is the file-drawer situation. Though sometimes, the insignificant results may take up the majority, researchers are still being p-hacker to chase for significant outcome. For example, studies showing insignificant correlation between acidification and fish activity are less likely to be published than those showing significant outcome.
+
++ *IF*. From the analysis we can see that there are some IF-bias and are likely due to the journals' preference.
+
+
+
+
+
+
+
+
+
+
 
 
 
