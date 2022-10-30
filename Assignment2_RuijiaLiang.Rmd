@@ -27,6 +27,7 @@ p_load(bookdown, devtools, tidyverse, ggforce, GGally, flextable, latex2exp, png
 
 # Preparation before analysing
 
+Load the three needed data into R.
 ```{r load the data, echo = FALSE, results = 'hide', warning=FALSE, error=FALSE, message=FALSE}
 # load the data into R
 raw_data <- read_csv("./data/OA_activitydat_20190302_BIOL3207.csv")
@@ -37,12 +38,14 @@ meta_data <- read_csv("./data/ocean_meta_data.csv")
 ```
 
 
+Of course the NAs need to be removed.
 ```{r remove NA}
 # remove the NAs in the data
 raw_data <- raw_data[complete.cases(raw_data),]
 ```
 
 
+Factor type is much more useful than the character type and it is supposed to be done at preparation step.
 ```{r convert into factors}
 # useful to have species and treatment column turning into factor type
 raw_data$species <- factor(raw_data$species)
@@ -50,14 +53,18 @@ raw_data$treatment <- factor(raw_data$treatment)
 ```
 
 
+Check problematic entries.
 ```{r check spelling}
 # check spelling in species and treatment by detecting whether there will be a new column caused by error
 table(raw_data$species)
 table(raw_data$treatment)
 ```
 
+Now the data is all clear! Ready for analysis!
+
 # Generate the summary statistics
 
+Get N and sd and means as we need them later for meta-analysis. I write this function to extract the needed values of each species, which is convient!
 
 ```{r get N and sd and means}
 # write a function to generate the statistics of each species under different treatment
@@ -92,6 +99,7 @@ get_statistics <- function(species_name){
 ```
 
 
+Make that into a well format.
 ```{r make a summary table}
 # combine the rows to get a summary data frame
 summary_table <- rbind(get_statistics("acantho"),get_statistics("ambon"),get_statistics("chromis"),get_statistics("humbug"),get_statistics("lemon"),get_statistics("whitedams"))
@@ -126,7 +134,7 @@ data <- na.omit(data)
 
 # Calculate the log response ratio (lnRR) effect size
 
-Apply the 'escalc' function to calculate the lnRR effext size
+Apply the 'escalc' function to calculate the lnRR effext size.
 
 ```{r lnRR effect size}
 # use 'ROM' in measure for the log transformed ratio of means
@@ -166,6 +174,7 @@ Make a extra column to the data in order to add the random effect of observation
 data$residual <- 1:dim(data)[1]
 ```
 
+Correct meta-analytic model fitted to the data that controls for the sampling variance of lnRR. 
 
 ```{r model,warning=FALSE}
 # conduct a multilevel meta-analytic model
@@ -244,7 +253,7 @@ funnel_1 <- metafor::funnel(x = data$lnRR, vi = data$lnRR_var, yaxis = "seinv",
                             xlab = "the log response ratio (lnRR)",  
                             # specify the y-axis limits
                             ylim=c(1:7,by=2),
-                            xlim=c(-3,3),
+                            xlim=c(-11,11),
                             # specify the location of the vertical ‘reference’ line
                             refline=0, 
                             # add the legend
@@ -254,9 +263,9 @@ funnel_1 <- metafor::funnel(x = data$lnRR, vi = data$lnRR_var, yaxis = "seinv",
 
 Based on Figure \@ref(fig:funnel-plot-1), we can derive the following arguments:
 
-+ 
-Missing corners can occur if there is publication bias, such as when some negative results are not published
++ More points lie in the positive space, indicating there is a positive correlation between the acidification and the level of fish activity.
 
++ A slightly missing corner occurs at the left bottom, suggesting that there is publication bias, such as when some negative results showing less significant correlation between the acidification and the level of fish activity are not published.
 
 
 # Time-lag plot
@@ -357,7 +366,7 @@ IF is likely to be one moderator for potential publication bias.
 
 ```{r if_MLMR,warning=FALSE}
 # apply rma.mv function to complete multilevel meta-regression
-# the moderator here is the IF
+# the moderator here is the IF of the publication year
 if_MLMR <- rma.mv(lnRR ~ Pub.year.IF, V = lnRR_var, random = list(~1 | Study, ~1 | residual), test = "t", dfs = "contain", data = data)
 
 if_MLMR
@@ -392,21 +401,46 @@ Based on the results, we can derive the following arguments:
 + *IF*. From the analysis we can see that there are some IF-bias and are likely due to the journals' preference.
 
 
+# Studies contributing to publication bias
+
++ *Time lag*. From Figure \@ref(fig:timelag-plot-1) we can spot that 2009, 2010 and 2014 have quite special results. These years are likely to contribute a lot to the publication bias.
+
+We can remove the studies in those years, and then conduct MLMR again to determine whether they contribute the major part to the publication bias.
+
+```{r filter data in 2009, 2010 and 2014}
+# filter the studies within 2009, 2010 and 2014 and store them in dat
+dat <- data %>% filter(data$Year..online. == '2009')
+dat <- data %>% filter(data$Year..online. == '2010')
+dat <- data %>% filter(data$Year..online. == '2014')
+```
 
 
+```{r year_MLMR_again,warning=FALSE}
+# apply rma.mv function to complete multilevel meta-regression
+# the moderator here is the online publication year
+year_MLMR_f <- rma.mv(lnRR ~ Year..online., V = lnRR_var, random = list(~1 | Study, ~1 | residual), test = "t", dfs = "contain", data = dat)
+
+year_MLMR_f
+```
 
 
+```{r r2_year_MLMR_again}
+# conduct statistical test to test for heterogeneity using r2_ml function
+r2_yearf_MLMR <- orchaRd::r2_ml(year_MLMR_f)
+r2_yearf_MLMR
+```
 
 
+Here we can see, after removing the studies published in 2009, 2010 and 2014, the other studies contribute much less variance than before. So we can determine that the studies published in 2009, 2010 and 2014 contirbute most to the time lag publication bias.
 
+Comparing with a meta-analysis by Clement *et. al.* (2022), my results acknowledge that authors are intended to selectively publish impressive results in prestigious journals with higher impact factor. This biased publishing can result in the proliferation of studies reporting strong effects, even though they may not be true.
 
+Some further concerns about the studies are:
++ Some mistakes made by authors are not intended but would interfere with the meta-analysis results to some extent.
++ Some values are extremely different from others. A possible explanation would be the different measurement but it is hard to ensure cause meta-analysis is dealing with such a large dataset.
 
+# References
 
+SSWAT, M., STIASNY, M. H., JUTFELT, F., RIEBESELL, U. & CLEMMESEN, C. 2018. Growth performance and survival of larval Atlantic herring, under the combined effects of elevated temperatures and CO2. Plos One, 13.
 
-
-
-
-
-
-
-
+SILVA, C. S. E., NOVAIS, S. C., LEMOS, M. F. L., MENDES, S., OLIVEIRA, A. P., GONCALVES, E. J. & FARIA, A. M. 2016. Effects of ocean acidification on the swimming ability, development and biochemical responses of sand smelt larvae. Science of the Total Environment, 563, 89-98.
