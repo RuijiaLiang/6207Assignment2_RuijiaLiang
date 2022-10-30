@@ -22,6 +22,9 @@ library(pacman)
 p_load(bookdown, devtools, tidyverse, ggforce, GGally, flextable, latex2exp, png, magick, metafor, MASS, emmeans, R.rsp, orchaRd, pander, mathjaxr, equatags, vembedr,data.table)
 ```
 
+
+[My GitHub Repository](https://github.com/RuijiaLiang/6207Assignment2_RuijiaLiang.git)
+
 # Preparation before analysing
 
 ```{r load the data, echo = FALSE, results = 'hide', warning=FALSE, error=FALSE, message=FALSE}
@@ -228,7 +231,7 @@ Funnel plots are mainly used to observe whether there are various biases in the 
 
 Here it is made to visually assess the possibility of publication bias.
 
-```{r funnel-plot, fig.cap=""}
+```{r funnel-plot-1, fig.cap=""}
 # make the funnel plot by 'funnel' function
 funnel_1 <- metafor::funnel(x = data$lnRR, vi = data$lnRR_var, yaxis = "seinv",
                             # specify the number of decimal places to which the tick mark labels of the x- and y-axis should be rounded.
@@ -248,7 +251,7 @@ funnel_1 <- metafor::funnel(x = data$lnRR, vi = data$lnRR_var, yaxis = "seinv",
 ```
 
 
-Based on Figure \@ref(fig:funnel-plot), we can derive the following arguments:
+Based on Figure \@ref(fig:funnel-plot-1), we can derive the following arguments:
 
 + 
 Missing corners can occur if there is publication bias, such as when some negative results are not published
@@ -257,18 +260,59 @@ Missing corners can occur if there is publication bias, such as when some negati
 
 # Time-lag plot
 
+Time-lag plot is to assess how effect sizes may or may not have changed through time.
+
+```{r timelag-plot-1, fig.cap="Plot of lnRR as a function of publication year. Points are scaled in relation to their precision (1/sqrt(lnRR_var)). Small points indicate effects with low precision or high sampling varaince"}
+# use online publication year as the data on x axis
+timelag_1 <- ggplot(data, aes(y = lnRR, x = Year..online.)) +
+  # scale the points in relation to their precision
+  geom_point(alpha = 0.3, aes(size = 1/sqrt(lnRR_var))) +
+  # add the regression line
+  geom_smooth(method = lm, col = "red", show.legend = FALSE) + 
+  # label the x axis and y axis and the legend
+  labs(x = "Publication Year",y = "the log response ratio (lnRR)", size = "Precision (1/SE)") +
+  theme_classic()
+
+timelag_1
+```
 
 
+Based on Figure \@ref(fig:timelag-plot-1), we can derive the following arguments:
+
++ It appears to be a negative and linear relationship with publication year.
+
++ Earlier year studies have slightly higher sampling variance, which means lower precision.
+
++ The earlier year studies show higher effect size compared with studies that are done in later years.
 
 
+# MLMR with year as a moderator for time-lag bias
+
+We can use multilevel meta-regression to quantify time lag bias.
+
+```{r year_MLMR}
+year_MLMR <- rma.mv(lnRR ~ Year..online., V = lnRR_var, random = list(~1 | Study, ~1 | residual), test = "t", dfs = "contain", data = data)
+summary(year_MLMR)
+```
 
 
+We may also wonder how much variation does time when results were published explain in lnRR.
+
+```{r r2_year_MLMR}
+r2_year_MLMR <- orchaRd::r2_ml(year_MLMR)
+r2_year_MLMR
+```
 
 
+Based on the results, we can derive the following arguments:
 
++ `r r2_year_MLMR[1]` indicates how much variation the ‘fixed effects’ or moderators explain in the model.
 
++ `r r2_year_MLMR[2]` indicates the full model, that accounts for the both the fixed and random effects, explains `r r2_year_MLMR[2]` of variance in effect size.
 
++ Time-lag explains `r r2_year_MLMR[1]` of the effect size variance.
 
++ However, linking to Figure \@ref(fig:timelag-plot-1) and the statistical examination, the evidence is not so strong to determine the huge effect of time lag, as it only contributes a little part of variance.
 
 
 
