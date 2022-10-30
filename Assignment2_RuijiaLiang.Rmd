@@ -291,14 +291,18 @@ Based on Figure \@ref(fig:timelag-plot-1), we can derive the following arguments
 We can use multilevel meta-regression to quantify time lag bias.
 
 ```{r year_MLMR}
+# apply rma.mv function to complete multilevel meta-regression
+# the moderator here is the online publication year
 year_MLMR <- rma.mv(lnRR ~ Year..online., V = lnRR_var, random = list(~1 | Study, ~1 | residual), test = "t", dfs = "contain", data = data)
+
 summary(year_MLMR)
 ```
 
 
-We may also wonder how much variation does time when results were published explain in lnRR.
+We may also wonder how much variation does time when results were published explain in lnRR. And this can be derived from $R^2$ test.
 
 ```{r r2_year_MLMR}
+# conduct statistical test to test for heterogeneity using r2_ml function
 r2_year_MLMR <- orchaRd::r2_ml(year_MLMR)
 r2_year_MLMR
 ```
@@ -306,13 +310,44 @@ r2_year_MLMR
 
 Based on the results, we can derive the following arguments:
 
-+ `r r2_year_MLMR[1]` indicates how much variation the ‘fixed effects’ or moderators explain in the model.
++ Marginal *R<sup>2</sup>* indicates how much variation the ‘fixed effects’ or moderators explain in the model.
 
-+ `r r2_year_MLMR[2]` indicates the full model, that accounts for the both the fixed and random effects, explains `r r2_year_MLMR[2]` of variance in effect size.
++ Conditional *R<sup>2</sup>* indicates the full model, that accounts for the both the fixed and random effects, explains `r r2_year_MLMR[2]*100`% of variance in effect size.
 
-+ Time-lag explains `r r2_year_MLMR[1]` of the effect size variance.
++ Time-lag explains `r r2_year_MLMR[1]*100`% of the effect size variance.
 
 + However, linking to Figure \@ref(fig:timelag-plot-1) and the statistical examination, the evidence is not so strong to determine the huge effect of time lag, as it only contributes a little part of variance.
+
+
+# MLMR with inverse sampling variance as a moderator for file-drawer bias
+
+Except for time lag bias, we also got file-drawer effects.
+
+```{r inverse_MLMR}
+# apply rma.mv function to complete multilevel meta-regression
+# the moderator here is the inverse sampling variance, presented as (1 / lnRR_var)
+inverse_MLMR <- rma.mv(lnRR ~ (1 / lnRR_var), V = lnRR_var, random = list(~1 | Study, ~1 | residual), test = "t", dfs = "contain", data = data)
+
+summary(inverse_MLMR)
+```
+
+
+
+```{r r2_inverse_MLMR}
+# conduct statistical test to test for heterogeneity using r2_ml function
+r2_inverse_MLMR <- orchaRd::r2_ml(inverse_MLMR)
+r2_inverse_MLMR
+```
+
+
+Based on the results, we can derive the following arguments:
+
++ The full model, that accounts for the both the fixed and random effects, explains `r r2_inverse_MLMR[2]*100`% of variance in effect size.
+
++ Inverse sampling variance explains `r r2_inverse_MLMR[1]*100`% of the effect size variance, which is very small.
+
+
+
 
 
 
